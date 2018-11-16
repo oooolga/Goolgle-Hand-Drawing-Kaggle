@@ -47,7 +47,7 @@ if __name__ == '__main__':
 	# get arguments
 	args = parse()
 
-	model = Model()
+	model = Model(vgg_name='VGG13')
 	if use_cuda:
 		model.cuda()
 
