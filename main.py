@@ -10,15 +10,13 @@ from tqdm import tqdm
 import numpy as np
 import argparse, os
 
-from util.load_data import load_quickdraw_data
-from util.model_util import save_checkpoint
+from util.load_data import load_quickdraw_data, get_unique_labels
+from util.model_util import save_checkpoint, load_checkpoint
 from models.vgg_model import Model
 
 state = {'train_loss': None,
 		 'valid_loss': None,
 		 'valid_accuracy': None}
-
-best_valid_loss = float('inf')
 
 model_path = 'saved_models/'
 
@@ -65,6 +63,7 @@ def test(model, data_loader, mode='valid'):
 	state['{}_acc'.format(mode)] = correct / len(data_loader.dataset)
 
 
+
 def parse():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-lr', '--learning_rate', default=5e-3, type=float,
@@ -77,8 +76,9 @@ def parse():
 						help='Total number of epochs.')
 	parser.add_argument('--seed', default=123, type=int,
 						help='Random number seed.')
-	parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay')
+	parser.add_argument('--weight_decay', default=5e-4, type=float, help='Weight decay')
 	parser.add_argument('--model_name', default='VGG', type=str, help='Model name')
+	parser.add_argument('--load_model', default=None, type=str, help='Load model path')
 
 	args = parser.parse_args()
 	return args
@@ -92,9 +92,6 @@ if __name__ == '__main__':
 	if use_cuda:
 		torch.cuda.manual_seed_all(args.seed)
 
-	train_loader, valid_loader, test_loader, unique_labels = load_quickdraw_data(batch_size=args.batch_size,
-																test_batch_size=args.test_batch_size)
-
 	model = Model()
 	if use_cuda:
 		model.cuda()
@@ -104,12 +101,23 @@ if __name__ == '__main__':
 	print('Total number of parameters: {}\n'.format(params))
 
 	optimizer = optim.Adam(params=model.parameters(), lr=args.learning_rate,
-						   eps=1e-07,
 						   weight_decay=args.weight_decay)
 
 	scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
 
-	epoch_start = 0
+	if args.load_model is None:
+		epoch_start = 0
+		best_valid_acc = 0
+		unique_labels = get_unique_labels()
+	else:
+		model, optimizer, epoch_start, best_valid_acc, unique_labels = \
+								load_checkpoint(args.load_model, model, optimizer)
+
+	train_loader, valid_loader = load_quickdraw_data(
+													batch_size=args.batch_size,
+													test_batch_size=args.test_batch_size,
+													unique_labels=unique_labels)
+
 
 	for epoch_i in range(epoch_start, args.epochs+1):
 		print('|\tEpoch {}/{}:'.format(epoch_i, args.epochs))
@@ -124,12 +132,12 @@ if __name__ == '__main__':
 																   state['valid_loss']))
 
 
-		if state['valid_loss'] < best_valid_loss:
-			best_valid_loss = state['valid_loss']
+		if state['valid_acc'] > best_valid_acc:
+			best_valid_acc = state['valid_acc']
 			save_checkpoint({
 				'epoch_i': epoch_i,
 				'state_dict': model.state_dict(),
 				'optimizer': optimizer.state_dict(),
-				'best_loss': best_valid_loss,
+				'best_acc': best_valid_acc,
 				'unique_labels': unique_labels
 				}, os.path.join(model_path, args.model_name+'.pt'))

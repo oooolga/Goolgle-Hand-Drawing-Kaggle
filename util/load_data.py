@@ -16,6 +16,7 @@ class QuickDrawDataset(Dataset):
 		self.train_im_path = train_im_path
 		self.test_im_path = test_im_path
 		self.train_label_path = train_label_path
+		self.mode = mode
 
 		if mode == 'train' or mode == 'valid':
 			train_im = np.load(self.train_im_path, encoding='bytes')
@@ -48,30 +49,36 @@ class QuickDrawDataset(Dataset):
 		return len(self.operating_im)
 
 	def __getitem__(self, idx):
-		if self.operating_labels is None:
-			curr_label = None
-		else:
-			curr_label = self.operating_labels[idx]
 
-		return {'image': self.operating_im[idx], 'label': curr_label}
+		if self.mode == 'test':
+			return {'image': self.operating_im[idx]}
+
+		return {'image': self.operating_im[idx], 'label': self.operating_labels[idx]}
+
+def get_unique_labels(train_label_path = './data/train_labels.csv'):
+	labels_df = pd.read_csv(train_label_path)
+	unique_labels = labels_df.Category.unique()
+	return unique_labels
+
+def load_quickdraw_test_data(test_batch_size, test_im_path='./data/test_images.npy'):
+	test_quickdraw_dataset = QuickDrawDataset(mode='test', test_im_path=test_im_path)
+	test_loader = DataLoader(test_quickdraw_dataset, batch_size=test_batch_size)
+	return test_loader
 
 
-def load_quickdraw_data(batch_size=50, test_batch_size=1000, 
+def load_quickdraw_data(unique_labels,
+						batch_size=50, test_batch_size=200, 
 						train_im_path='./data/train_images.npy',
-						test_im_path='./data/test_images.npy',
-						train_label_path = './data/train_labels.csv',
-						unique_labels=None):
-	if unique_labels is None:
-		labels_df = pd.read_csv(train_label_path)
-		unique_labels = labels_df.Category.unique()
-
-	train_quickdraw_dataset = QuickDrawDataset(mode='train', unique_labels=unique_labels)
+						train_label_path = './data/train_labels.csv'):
+		
+	train_quickdraw_dataset = QuickDrawDataset(mode='train', unique_labels=unique_labels,
+											   train_im_path=train_im_path,
+											   train_label_path=train_label_path)
 	train_loader = DataLoader(train_quickdraw_dataset, batch_size=batch_size, shuffle=True)
 
-	valid_quickdraw_dataset = QuickDrawDataset(mode='valid', unique_labels=unique_labels)
+	valid_quickdraw_dataset = QuickDrawDataset(mode='valid', unique_labels=unique_labels,
+											   train_im_path=train_im_path,
+											   train_label_path=train_label_path)
 	valid_loader = DataLoader(valid_quickdraw_dataset, batch_size=test_batch_size)
 
-	test_quickdraw_dataset = QuickDrawDataset(mode='test')
-	test_loader = DataLoader(test_quickdraw_dataset, batch_size=test_batch_size)
-
-	return train_loader, valid_loader, test_loader, unique_labels
+	return train_loader, valid_loader
