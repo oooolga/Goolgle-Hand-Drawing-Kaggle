@@ -94,7 +94,7 @@ if __name__ == '__main__':
 		torch.cuda.manual_seed_all(args.seed)
 
 	#model = Model(vgg_name='VGG13')
-	model = resnet(model_name='resnet34', pretrained=False, num_classes=31)
+	model = resnet(model_name='resnet18', pretrained=False, num_classes=31)
 	if use_cuda:
 		model.cuda()
 

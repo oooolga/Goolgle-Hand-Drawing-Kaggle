@@ -1,5 +1,6 @@
 data/
 saved_models/
 results/
+core
 *.pyc
 */__pycache__
