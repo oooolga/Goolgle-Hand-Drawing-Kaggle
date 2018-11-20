@@ -11,10 +11,10 @@ cfg = {
 	'VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
 }
 
-class Model(nn.Module):
+class VGGModel(nn.Module):
 
 	def __init__(self, c_in=1, nlabels=31, vgg_name='VGG11'):
-		super(Model, self).__init__()
+		super(VGGModel, self).__init__()
 		self.nlabels = nlabels
 		self.c_in = c_in
 		self.features = self._make_layers(cfg[vgg_name])

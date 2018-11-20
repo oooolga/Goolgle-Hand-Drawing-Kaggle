@@ -10,7 +10,7 @@ from tqdm import tqdm
 import numpy as np
 import argparse, os
 
-from util.load_data import load_quickdraw_data, get_unique_labels
+from util.load_data import load_quickdraw_data_no_empty, get_unique_labels
 from util.model_util import save_checkpoint, load_checkpoint
 from models.vgg_model import VGGModel
 from models.ResNet import resnet
@@ -99,7 +99,7 @@ if __name__ == '__main__':
 
 	#model = VGGModel(vgg_name='VGG13')
 	#model = resnet(model_name='resnet18', pretrained=False, num_classes=31)
-	model = AttentionLocalizationModel()
+	model = AttentionLocalizationModel(nlabels=30)
 	if use_cuda:
 		model.cuda()
 
@@ -120,7 +120,7 @@ if __name__ == '__main__':
 		model, optimizer, epoch_start, best_valid_acc, unique_labels = \
 								load_checkpoint(args.load_model, model, optimizer)
 
-	train_loader, valid_loader = load_quickdraw_data(
+	train_loader, valid_loader = load_quickdraw_data_no_empty(
 													batch_size=args.batch_size,
 													test_batch_size=args.test_batch_size,
 													unique_labels=unique_labels)

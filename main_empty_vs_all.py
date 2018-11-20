@@ -10,11 +10,12 @@ from tqdm import tqdm
 import numpy as np
 import argparse, os
 
-from util.load_data import load_quickdraw_data, get_unique_labels
+from util.load_data import load_quickdraw_data, get_unique_labels, \
+						   load_quickdraw_data_empty_vs_all
 from util.model_util import save_checkpoint, load_checkpoint
 from models.vgg_model import VGGModel
 from models.ResNet import resnet
-from models.attention_localization import AttentionLocalizationModel
+from models.basic_model import BasicModel, crop_images
 
 state = {'train_loss': None,
 		 'valid_loss': None,
@@ -45,24 +46,23 @@ def test(model, data_loader, mode='valid'):
 	loss_avg = 0.0
 	correct = 0
 
-	with torch.no_grad():
-		for i_batch, batch in tqdm(enumerate(data_loader)):
+	for i_batch, batch in tqdm(enumerate(data_loader)):
 
-			data, target = batch['image'].type(torch.FloatTensor), \
-						   batch['label'].type(torch.long)
+		data, target = batch['image'].type(torch.FloatTensor), \
+					   batch['label'].type(torch.long)
 
-			if use_cuda:
-				data, target = data.cuda(), target.cuda()
+		if use_cuda:
+			data, target = data.cuda(), target.cuda()
 
-			output = model(data)
-			loss = F.cross_entropy(output, target)
+		cropped_im = cropped_crop_images(data)
 
-			pred = output.data.max(1)[1]
-			correct += float(pred.eq(target.data).sum())
+		output = model(data)
+		loss = F.cross_entropy(output, target)
 
-			loss_avg += float(loss)
+		pred = output.data.max(1)[1]
+		correct += float(pred.eq(target.data).sum())
 
-			del output, data, target
+		loss_avg += float(loss)
 
 	state['{}_loss'.format(mode)] = loss_avg / len(data_loader)
 	state['{}_acc'.format(mode)] = correct / len(data_loader.dataset)
@@ -99,15 +99,15 @@ if __name__ == '__main__':
 
 	#model = VGGModel(vgg_name='VGG13')
 	#model = resnet(model_name='resnet18', pretrained=False, num_classes=31)
-	model = AttentionLocalizationModel()
+	model_empty_vs_all = BasicModel(nlabels=2)
 	if use_cuda:
-		model.cuda()
+		model_empty_vs_all.cuda()
 
-	model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+	model_parameters = filter(lambda p: p.requires_grad, model_empty_vs_all.parameters())
 	params = sum([np.prod(p.size()) for p in model_parameters])
 	print('Total number of parameters: {}\n'.format(params))
 
-	optimizer = optim.Adam(params=model.parameters(), lr=args.learning_rate,
+	optimizer = optim.Adam(params=model_empty_vs_all.parameters(), lr=args.learning_rate,
 						   weight_decay=args.weight_decay)
 
 	scheduler = StepLR(optimizer, step_size=50, gamma=0.1)
@@ -117,10 +117,10 @@ if __name__ == '__main__':
 		best_valid_acc = 0
 		unique_labels = get_unique_labels()
 	else:
-		model, optimizer, epoch_start, best_valid_acc, unique_labels = \
-								load_checkpoint(args.load_model, model, optimizer)
+		model_empty_vs_all, optimizer, epoch_start, best_valid_acc, unique_labels = \
+								load_checkpoint(args.load_model, model_empty_vs_all, optimizer)
 
-	train_loader, valid_loader = load_quickdraw_data(
+	train_empty_vs_all_loader, valid_empty_vs_all_loader = load_quickdraw_data_empty_vs_all(
 													batch_size=args.batch_size,
 													test_batch_size=args.test_batch_size,
 													unique_labels=unique_labels)
@@ -131,9 +131,9 @@ if __name__ == '__main__':
 		scheduler.step()
 
 		if epoch_i != 0:
-			train(model, optimizer, train_loader)
+			train(model_empty_vs_all, optimizer, train_empty_vs_all_loader)
 
-		test(model, valid_loader)
+		test(model_empty_vs_all, valid_empty_vs_all_loader)
 
 		print('|\t\t[Valid]:\taccuracy={:.3f}\tloss={:.3f}'.format(state['valid_acc'],
 																   state['valid_loss']))
@@ -143,7 +143,7 @@ if __name__ == '__main__':
 			best_valid_acc = state['valid_acc']
 			save_checkpoint({
 				'epoch_i': epoch_i,
-				'state_dict': model.state_dict(),
+				'state_dict': model_empty_vs_all.state_dict(),
 				'optimizer': optimizer.state_dict(),
 				'best_acc': best_valid_acc,
 				'unique_labels': unique_labels
