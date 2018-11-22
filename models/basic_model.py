@@ -11,22 +11,26 @@ class BasicModel(nn.Module):
 		self.nlabels = nlabels
 		self.c_in = c_in
 		self.features = nn.Sequential(
-			nn.Conv2d(c_in, 64, kernel_size=5, padding=2),
+			nn.Conv2d(c_in, 64, kernel_size=3, padding=1),
+			nn.Dropout2d(),
 			nn.BatchNorm2d(64),
 			nn.ReLU(inplace=True),
-			nn.Conv2d(64, 64, kernel_size=3),
+			nn.MaxPool2d(kernel_size=2),
+			nn.Conv2d(64, 64, kernel_size=5),
+			nn.Dropout2d(),
 			nn.BatchNorm2d(64),
 			nn.ReLU(inplace=True),
-			nn.MaxPool2d(kernel_size=2, stride=2),
-			nn.Conv2d(64, 128, kernel_size=3, stride=3),
+			nn.MaxPool2d(kernel_size=2),
+			nn.Conv2d(64, 128, kernel_size=5, stride=3),
+			nn.Dropout2d(),
 			nn.BatchNorm2d(128),
 			nn.ReLU(inplace=True),
-			nn.MaxPool2d(kernel_size=2, stride=2),
-			nn.Conv2d(128, 128, kernel_size=3,),
+			nn.MaxPool2d(kernel_size=2),
+			nn.Conv2d(128, 128, kernel_size=3),
+			nn.Dropout2d(),
 			nn.BatchNorm2d(128),
-			nn.ReLU(inplace=True),
-			nn.AdaptiveAvgPool2d((1,1)))
-		self.classifier = nn.Linear(128, self.nlabels)
+			nn.ReLU(inplace=True))
+		self.classifier = nn.Linear(128, nlabels)
 
 		nn.init.kaiming_normal_(self.classifier.weight)
 
@@ -38,10 +42,11 @@ class BasicModel(nn.Module):
 				nn.init.constant_(m.bias, 0)
 
 	def forward(self, x):
-		out = self.features(x)
-		out = out.view(out.size(0), -1)
+		batch_size = x.size(0)
+		out = self.features(x).view(batch_size, -1)
 		out = self.classifier(out)
 		return out
+
 
 def crop_images(im, kernel_size=30, stride=2, im_size=(100,100)):
 	batch_size = im.size(0)

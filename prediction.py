@@ -13,7 +13,7 @@ import argparse, os
 from util.load_data import load_quickdraw_data, get_unique_labels, load_quickdraw_test_data
 from util.save_prediction import get_prediction_dataframe
 from util.model_util import save_checkpoint, load_checkpoint
-from models.vgg_model import Model
+from models.vgg_model import VGGModel
 
 result_path = 'results/'
 
@@ -47,7 +47,7 @@ if __name__ == '__main__':
 	# get arguments
 	args = parse()
 
-	model = Model(vgg_name='VGG13')
+	model = VGGModel(vgg_name='VGG13')
 	if use_cuda:
 		model.cuda()
 

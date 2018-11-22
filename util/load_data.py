@@ -5,6 +5,9 @@ import pdb
 import torch
 from torch.utils.data import Dataset, DataLoader
 
+shuffle_idx = np.arange(10000)
+np.random.shuffle(shuffle_idx)
+
 class QuickDrawDataset(Dataset):
 
 	def __init__(self, train_im_path='./data/train_images.npy',
@@ -21,8 +24,6 @@ class QuickDrawDataset(Dataset):
 		if mode == 'train' or mode == 'valid':
 			train_im = np.load(self.train_im_path, encoding='bytes')
 			train_im = np.concatenate(train_im[:,1]).reshape((-1,1,100,100))
-			shuffle_idx = np.arange(len(train_im))
-			np.random.shuffle(shuffle_idx)
 			train_im = train_im[shuffle_idx]
 
 			total_train = int(len(train_im)*0.9)
@@ -42,7 +43,6 @@ class QuickDrawDataset(Dataset):
 			self.operating_im = np.concatenate(test_im[:,1])\
 									.reshape((-1,1,100,100))
 			self.operating_labels = None
-
 
 	def set_numeric_labels(self, labels_df, unique_labels):
 
@@ -79,8 +79,6 @@ class QuickDrawDatasetEmptyVSAll(Dataset):
 		if mode == 'train' or mode == 'valid':
 			train_im = np.load(self.train_im_path, encoding='bytes')
 			train_im = np.concatenate(train_im[:,1]).reshape((-1,1,100,100))
-			shuffle_idx = np.arange(len(train_im))
-			np.random.shuffle(shuffle_idx)
 			train_im = train_im[shuffle_idx]
 
 			train_labels_df = pd.read_csv(self.train_label_path)
@@ -146,9 +144,6 @@ class QuickDrawDatasetNoEmpty(Dataset):
 		if mode == 'train' or mode == 'valid':
 			train_im = np.load(self.train_im_path, encoding='bytes')
 			train_im = np.concatenate(train_im[:,1]).reshape((-1,1,100,100))
-
-			shuffle_idx = np.arange(len(train_im))
-			np.random.shuffle(shuffle_idx)
 			train_im = train_im[shuffle_idx]
 
 			train_labels_df = pd.read_csv(self.train_label_path)
@@ -163,6 +158,7 @@ class QuickDrawDatasetNoEmpty(Dataset):
 			train_labels = train_labels[train_idx]
 
 			if mode == 'train':
+
 				self.operating_im = train_im[:total_train]
 				self.operating_labels = train_labels[:total_train]
 			else:

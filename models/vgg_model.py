@@ -5,6 +5,7 @@ from torch.nn import init
 import pdb
 
 cfg = {
+	'VGG8': [32, 'M', 32, 'M', 32, 'M', 64, 'M', 64, 'M'],
 	'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
 	'VGG13': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
 	'VGG16': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
@@ -18,7 +19,7 @@ class VGGModel(nn.Module):
 		self.nlabels = nlabels
 		self.c_in = c_in
 		self.features = self._make_layers(cfg[vgg_name])
-		self.classifier = nn.Linear(512, self.nlabels)
+		self.classifier = nn.Linear(cfg[vgg_name][-2], self.nlabels)
 
 		nn.init.kaiming_normal_(self.classifier.weight)
 
@@ -34,7 +35,6 @@ class VGGModel(nn.Module):
 		out = out.view(out.size(0), -1)
 		out = self.classifier(out)
 		return out
-
 
 	def _make_layers(self, cfg):
 		layers = []

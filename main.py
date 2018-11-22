@@ -14,6 +14,7 @@ from util.load_data import load_quickdraw_data, get_unique_labels
 from util.model_util import save_checkpoint, load_checkpoint
 from models.vgg_model import VGGModel
 from models.ResNet import resnet
+from models.basic_model import BasicModel
 from models.attention_localization import AttentionLocalizationModel
 
 state = {'train_loss': None,
@@ -71,7 +72,7 @@ def test(model, data_loader, mode='valid'):
 
 def parse():
 	parser = argparse.ArgumentParser()
-	parser.add_argument('-lr', '--learning_rate', default=1e-2, type=float,
+	parser.add_argument('-lr', '--learning_rate', default=5e-2, type=float,
 						help='Learning rate.')
 	parser.add_argument('--batch_size', default=50, type=int,
 						help='Mini-batch size for training.')
@@ -81,7 +82,7 @@ def parse():
 						help='Total number of epochs.')
 	parser.add_argument('--seed', default=123, type=int,
 						help='Random number seed.')
-	parser.add_argument('--weight_decay', default=5e-8, type=float, help='Weight decay')
+	parser.add_argument('--weight_decay', default=1e-7, type=float, help='Weight decay')
 	parser.add_argument('--model_name', required=True, type=str, help='Model name')
 	parser.add_argument('--load_model', default=None, type=str, help='Load model path')
 
@@ -97,9 +98,10 @@ if __name__ == '__main__':
 	if use_cuda:
 		torch.cuda.manual_seed_all(args.seed)
 
-	#model = VGGModel(vgg_name='VGG13')
-	#model = resnet(model_name='resnet18', pretrained=False, num_classes=31)
-	model = AttentionLocalizationModel()
+	# model = VGGModel(vgg_name='VGG8')
+	# model = resnet(model_name='resnet18', pretrained=False, num_classes=31)
+	model = AttentionLocalizationModel(nlabels=31)
+	#model = BasicModel()
 	if use_cuda:
 		model.cuda()
 
@@ -109,8 +111,10 @@ if __name__ == '__main__':
 
 	optimizer = optim.Adam(params=model.parameters(), lr=args.learning_rate,
 						   weight_decay=args.weight_decay)
+	# optimizer = optim.SGD(model.parameters(), lr = args.learning_rate, momentum=0.9,
+	# 					  weight_decay=args.weight_decay)
 
-	scheduler = StepLR(optimizer, step_size=50, gamma=0.1)
+	scheduler = StepLR(optimizer, step_size=5, gamma=0.8)
 
 	if args.load_model is None:
 		epoch_start = 0
@@ -134,6 +138,10 @@ if __name__ == '__main__':
 			train(model, optimizer, train_loader)
 
 		test(model, valid_loader)
+		test(model, train_loader, mode='train')
+
+		print('|\t\t[Train]:\taccuracy={:.3f}\tloss={:.3f}'.format(state['train_acc'],
+																   state['train_loss']))
 
 		print('|\t\t[Valid]:\taccuracy={:.3f}\tloss={:.3f}'.format(state['valid_acc'],
 																   state['valid_loss']))

@@ -110,7 +110,7 @@ if __name__ == '__main__':
 	optimizer = optim.Adam(params=model_empty_vs_all.parameters(), lr=args.learning_rate,
 						   weight_decay=args.weight_decay)
 
-	scheduler = StepLR(optimizer, step_size=50, gamma=0.1)
+	scheduler = StepLR(optimizer, step_size=20, gamma=0.8)
 
 	if args.load_model is None:
 		epoch_start = 0

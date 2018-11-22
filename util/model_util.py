@@ -16,7 +16,7 @@ def load_checkpoint(model_path, model, optimizer):
 		best_valid_acc = checkpoint['best_acc']
 		unique_labels = checkpoint['unique_labels']
 	else:
-		print('File {} not found.'.format(model_name))
+		print('File {} not found.'.format(model_path))
 		raise FileNotFoundError
 
 	return model, optimizer, epoch_i, best_valid_acc, unique_labels
