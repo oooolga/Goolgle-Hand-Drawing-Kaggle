@@ -83,9 +83,10 @@ def parse():
 						help='Total number of epochs.')
 	parser.add_argument('--seed', default=123, type=int,
 						help='Random number seed.')
-	parser.add_argument('--weight_decay', default=1e-7, type=float, help='Weight decay')
+	parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay')
 	parser.add_argument('--model_name', required=True, type=str, help='Model name')
 	parser.add_argument('--load_model', default=None, type=str, help='Load model path')
+	parser.add_argument('--optimizer', default='Adam', type=str, help='Optimizer type')
 
 	args = parser.parse_args()
 	return args
@@ -109,12 +110,15 @@ if __name__ == '__main__':
 	params = sum([np.prod(p.size()) for p in model_parameters])
 	print('Total number of parameters: {}\n'.format(params))
 
-	optimizer = optim.Adam(params=model.parameters(), lr=args.learning_rate,
-						   weight_decay=args.weight_decay)
-	# optimizer = optim.SGD(model.parameters(), lr = args.learning_rate, momentum=0.9,
-	# 					  weight_decay=args.weight_decay)
+	if args.optimizer == 'Adam':
 
-	scheduler = StepLR(optimizer, step_size=10, gamma=0.8)
+		optimizer = optim.Adam(params=model.parameters(), lr=args.learning_rate,
+							   weight_decay=args.weight_decay)
+	else:
+		optimizer = optim.SGD(model.parameters(), lr = args.learning_rate, momentum=0.9,
+							  weight_decay=args.weight_decay)
+
+	scheduler = StepLR(optimizer, step_size=2, gamma=0.8)
 
 	if args.load_model is None:
 		epoch_start = 0

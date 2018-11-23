@@ -4,6 +4,9 @@ import pdb
 
 import torch
 from torch.utils.data import Dataset, DataLoader
+import torchvision.transforms as transforms
+
+from PIL import Image
 
 shuffle_idx = np.arange(10000)
 np.random.shuffle(shuffle_idx)
@@ -14,16 +17,20 @@ class QuickDrawDataset(Dataset):
 				 test_im_path='./data/test_images.npy',
 				 train_label_path = './data/train_labels.csv',
 				 unique_labels = None,
-				 mode='train'):
+				 mode='train', transform=None,
+				 target_transfrom=None):
 
 		self.train_im_path = train_im_path
 		self.test_im_path = test_im_path
 		self.train_label_path = train_label_path
 		self.mode = mode
+		self.transform = transform
+		self.target_transfrom = target_transfrom
 
 		if mode == 'train' or mode == 'valid':
 			train_im = np.load(self.train_im_path, encoding='bytes')
-			train_im = np.concatenate(train_im[:,1]).reshape((-1,1,100,100))
+			train_im = np.concatenate(train_im[:,1]).reshape((-1,100,100))
+			train_im = train_im.astype('uint8')
 			train_im = train_im[shuffle_idx]
 
 			total_train = int(len(train_im)*0.9)
@@ -41,7 +48,7 @@ class QuickDrawDataset(Dataset):
 		elif mode == 'test':
 			test_im = np.load(self.test_im_path, encoding='bytes')
 			self.operating_im = np.concatenate(test_im[:,1])\
-									.reshape((-1,1,100,100))
+									.reshape((-1,100,100)).astype('uint8')
 			self.operating_labels = None
 
 	def set_numeric_labels(self, labels_df, unique_labels):
@@ -55,11 +62,16 @@ class QuickDrawDataset(Dataset):
 		return len(self.operating_im)
 
 	def __getitem__(self, idx):
+		img = self.operating_im[idx]
+		img = Image.fromarray(img)
+
+		if self.transform is not None:
+			img = self.transform(img)
 
 		if self.mode == 'test':
-			return {'image': self.operating_im[idx]}
+			return {'image': img}
 
-		return {'image': self.operating_im[idx],
+		return {'image': img,
 				'label': self.operating_labels[idx]}
 
 
@@ -69,16 +81,21 @@ class QuickDrawDatasetEmptyVSAll(Dataset):
 				 test_im_path='./data/test_images.npy',
 				 train_label_path = './data/train_labels.csv',
 				 unique_labels = None,
-				 mode='train'):
+				 mode='train', transform=None,
+				 target_transfrom=None):
 
 		self.train_im_path = train_im_path
 		self.test_im_path = test_im_path
 		self.train_label_path = train_label_path
 		self.mode = mode
 
+		self.transform = transform
+		self.target_transfrom = target_transfrom
+
 		if mode == 'train' or mode == 'valid':
 			train_im = np.load(self.train_im_path, encoding='bytes')
-			train_im = np.concatenate(train_im[:,1]).reshape((-1,1,100,100))
+			train_im = np.concatenate(train_im[:,1]).reshape((-1,100,100))
+			train_im = train_im.astype('uint8')
 			train_im = train_im[shuffle_idx]
 
 			train_labels_df = pd.read_csv(self.train_label_path)
@@ -125,7 +142,13 @@ class QuickDrawDatasetEmptyVSAll(Dataset):
 
 	def __getitem__(self, idx):
 
-		return {'image': self.operating_im[idx],
+		img = self.operating_im[idx]
+		img = Image.fromarray(img)
+
+		if self.transform is not None:
+			img = self.transform(img)
+
+		return {'image': img,
 				'label': self.operating_labels[idx]}
 
 class QuickDrawDatasetNoEmpty(Dataset):
@@ -134,16 +157,21 @@ class QuickDrawDatasetNoEmpty(Dataset):
 				 test_im_path='./data/test_images.npy',
 				 train_label_path = './data/train_labels.csv',
 				 unique_labels = None,
-				 mode='train'):
+				 mode='train', transform=None,
+				 target_transfrom=None):
 
 		self.train_im_path = train_im_path
 		self.test_im_path = test_im_path
 		self.train_label_path = train_label_path
 		self.mode = mode
 
+		self.transform = transform
+		self.target_transfrom = target_transfrom
+
 		if mode == 'train' or mode == 'valid':
 			train_im = np.load(self.train_im_path, encoding='bytes')
-			train_im = np.concatenate(train_im[:,1]).reshape((-1,1,100,100))
+			train_im = np.concatenate(train_im[:,1]).reshape((-1,100,100))
+			train_im = train_im.astype('uint8')
 			train_im = train_im[shuffle_idx]
 
 			train_labels_df = pd.read_csv(self.train_label_path)
@@ -182,10 +210,17 @@ class QuickDrawDatasetNoEmpty(Dataset):
 		return len(self.operating_im)
 
 	def __getitem__(self, idx):
+		img = self.operating_im[idx]
+		img = Image.fromarray(img)
 
-		return {'image': self.operating_im[idx],
+		if self.transform is not None:
+			img = self.transform(img)
+
+		if self.mode == 'test':
+			return {'image': img}
+
+		return {'image': img,
 				'label': self.operating_labels[idx]}
-
 
 def get_unique_labels(train_label_path = './data/train_labels.csv'):
 	labels_df = pd.read_csv(train_label_path)
@@ -194,28 +229,39 @@ def get_unique_labels(train_label_path = './data/train_labels.csv'):
 
 def load_quickdraw_test_data(test_batch_size,
 							 test_im_path='./data/test_images.npy'):
+
+	transform_test = transforms.Compose([transforms.ToTensor()])
 	test_quickdraw_dataset = QuickDrawDataset(mode='test',
-											  test_im_path=test_im_path)
+											  test_im_path=test_im_path,
+											  transform=transform_test)
 	test_loader = DataLoader(test_quickdraw_dataset, batch_size=test_batch_size)
 	return test_loader
-
 
 def load_quickdraw_data(unique_labels,
 						batch_size=50, test_batch_size=200, 
 						train_im_path='./data/train_images.npy',
 						train_label_path = './data/train_labels.csv'):
+	transform_train = transforms.Compose([
+			transforms.RandomCrop(100, padding=5),
+			transforms.RandomHorizontalFlip(),
+			transforms.ToTensor()
+		])
+
+	transform_test = transforms.Compose([transforms.ToTensor()])
 		
 	train_quickdraw_dataset = QuickDrawDataset(mode='train',
 											   unique_labels=unique_labels,
 											   train_im_path=train_im_path,
-											   train_label_path=train_label_path)
+											   train_label_path=train_label_path,
+											   transform=transform_train)
 	train_loader = DataLoader(train_quickdraw_dataset, batch_size=batch_size,
 							  shuffle=True)
 
 	valid_quickdraw_dataset = QuickDrawDataset(mode='valid',
 											   unique_labels=unique_labels,
 											   train_im_path=train_im_path,
-											   train_label_path=train_label_path)
+											   train_label_path=train_label_path,
+											   transform=transform_test)
 	valid_loader = DataLoader(valid_quickdraw_dataset, batch_size=test_batch_size)
 
 	return train_loader, valid_loader
@@ -224,18 +270,28 @@ def load_quickdraw_data_empty_vs_all(unique_labels,
 									 batch_size=50, test_batch_size=200, 
 									 train_im_path='./data/train_images.npy',
 									 train_label_path = './data/train_labels.csv'):
+
+	transform_train = transforms.Compose([
+			transforms.RandomCrop(100, padding=5),
+			transforms.RandomHorizontalFlip(),
+			transforms.ToTensor()
+		])
+
+	transform_test = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()])
 		
 	train_quickdraw_dataset = QuickDrawDatasetEmptyVSAll(mode='train',
 											   unique_labels=unique_labels,
 											   train_im_path=train_im_path,
-											   train_label_path=train_label_path)
+											   train_label_path=train_label_path,
+											   transform=transform_train)
 	train_loader = DataLoader(train_quickdraw_dataset, batch_size=batch_size,
 							  shuffle=True)
 
 	valid_quickdraw_dataset = QuickDrawDatasetEmptyVSAll(mode='valid',
 											   unique_labels=unique_labels,
 											   train_im_path=train_im_path,
-											   train_label_path=train_label_path)
+											   train_label_path=train_label_path,
+											   transform=transform_test)
 	valid_loader = DataLoader(valid_quickdraw_dataset, batch_size=test_batch_size)
 
 	return train_loader, valid_loader
@@ -244,18 +300,28 @@ def load_quickdraw_data_no_empty(unique_labels,
 									 batch_size=50, test_batch_size=200, 
 									 train_im_path='./data/train_images.npy',
 									 train_label_path = './data/train_labels.csv'):
+
+	transform_train = transforms.Compose([
+			transforms.RandomCrop(100, padding=5),
+			transforms.RandomHorizontalFlip(),
+			transforms.ToTensor()
+		])
+
+	transform_test = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()])
 		
 	train_quickdraw_dataset = QuickDrawDatasetNoEmpty(mode='train',
 											   unique_labels=unique_labels,
 											   train_im_path=train_im_path,
-											   train_label_path=train_label_path)
+											   train_label_path=train_label_path,
+											   transform=transform_train)
 	train_loader = DataLoader(train_quickdraw_dataset, batch_size=batch_size,
 							  shuffle=True)
 
 	valid_quickdraw_dataset = QuickDrawDatasetNoEmpty(mode='valid',
 											   unique_labels=unique_labels,
 											   train_im_path=train_im_path,
-											   train_label_path=train_label_path)
+											   train_label_path=train_label_path,
+											   transform=transform_test)
 	valid_loader = DataLoader(valid_quickdraw_dataset, batch_size=test_batch_size)
 
 	return train_loader, valid_loader

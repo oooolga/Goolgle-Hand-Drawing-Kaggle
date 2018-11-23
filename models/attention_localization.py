@@ -34,51 +34,48 @@ class AttentionLocalizationModel(nn.Module):
 		self.nlabels = nlabels
 		self.c_in = c_in
 		# self.layers = 2
-		# self.features = nn.Sequential(
-		# 	nn.Conv2d(c_in, 32, kernel_size=3, padding=1),
-		# 	nn.Dropout2d(p=0.25),
-		# 	nn.BatchNorm2d(32),
-		# 	nn.ReLU(),
-		# 	nn.MaxPool2d(kernel_size=2, stride=2),
-		# 	nn.Conv2d(32, 50, kernel_size=3),
-		# 	nn.Dropout2d(p=0.25),
-		# 	nn.BatchNorm2d(50),
-		# 	nn.ReLU(),
-		# 	nn.MaxPool2d(kernel_size=2, stride=2),
-		# 	nn.Conv2d(50, 50, kernel_size=3),
-		# 	nn.Dropout2d(p=0.25),
-		# 	nn.BatchNorm2d(50),
-		# 	nn.ReLU())#,
-		# 	#nn.AdaptiveAvgPool2d((1,1)))
 		self.features = nn.Sequential(
-			nn.Conv2d(c_in, 64, kernel_size=3),
-			#nn.Dropout2d(),
-			nn.BatchNorm2d(64),
+			nn.Conv2d(c_in, 16, kernel_size=3),
+			nn.BatchNorm2d(16),
 			nn.ReLU(),
-			nn.Conv2d(64, 64, kernel_size=3),
-			#nn.Dropout2d(),
-			nn.BatchNorm2d(64),
+			#nn.MaxPool2d(kernel_size=2, stride=2),
+			nn.Conv2d(16, 32, kernel_size=5, stride=2),
+			nn.BatchNorm2d(32),
 			nn.ReLU(),
-			nn.Conv2d(64, 128, kernel_size=5, stride=3),
-			#nn.Dropout2d(),
-			nn.BatchNorm2d(128),
-			nn.ReLU(),
-			nn.Conv2d(128, 256, kernel_size=3),
-			#nn.Dropout2d(),
-			nn.BatchNorm2d(256),
-			nn.ReLU(),
-			nn.AdaptiveAvgPool2d((1,1)))
+			nn.MaxPool2d(kernel_size=2, stride=2),
+			nn.Conv2d(32, 32, kernel_size=5),
+			nn.BatchNorm2d(32),
+			nn.ReLU())
+		# self.features = nn.Sequential(
+		# 	nn.Conv2d(c_in, 64, kernel_size=3),
+		# 	#nn.Dropout2d(),
+		# 	nn.BatchNorm2d(64),
+		# 	nn.ReLU(),
+		# 	nn.Conv2d(64, 64, kernel_size=3),
+		# 	#nn.Dropout2d(),
+		# 	nn.BatchNorm2d(64),
+		# 	nn.ReLU(),
+		# 	nn.Conv2d(64, 128, kernel_size=5, stride=3),
+		# 	#nn.Dropout2d(),
+		# 	nn.BatchNorm2d(128),
+		# 	nn.ReLU(),
+		# 	nn.Conv2d(128, 256, kernel_size=3),
+		# 	#nn.Dropout2d(),
+		# 	nn.BatchNorm2d(256),
+		# 	nn.ReLU(),
+		# 	nn.AdaptiveAvgPool2d((1,1)))
 
 		# self.rnn = nn.GRUCell(256, 256)
 		# self.h0 = torch.randn(1, 256)
 		# if use_cuda:
 		# 	self.h0 = self.h0.cuda()
 
-		self.attention_1 = new_parameter(256, 32)
-		self.attention_2 = new_parameter(32, 1)
+		self.drop_out = nn.Dropout()
+		self.attention_1 = new_parameter(128, 1)
+		#self.attention_2 = new_parameter(32, 1)
 
 		self.classifier = nn.Sequential(
-			nn.Linear(256, 50),
+			nn.Linear(128, 50),
 			nn.ReLU(),
 			nn.Linear(50, self.nlabels)
 			)
@@ -92,14 +89,14 @@ class AttentionLocalizationModel(nn.Module):
 			elif isinstance(m, nn.Linear):
 				nn.init.kaiming_normal_(m.weight)
 
-			if type(m) in [nn.GRU, nn.LSTM, nn.RNN, nn.GRUCell]:
-				for name, param in m.named_parameters():
-					if 'weight_ih' in name:
-						torch.nn.init.xavier_uniform_(param.data)
-					elif 'weight_hh' in name:
-						torch.nn.init.orthogonal_(param.data)
-					elif 'bias' in name:
-						param.data.fill_(0)
+			# if type(m) in [nn.GRU, nn.LSTM, nn.RNN, nn.GRUCell]:
+			# 	for name, param in m.named_parameters():
+			# 		if 'weight_ih' in name:
+			# 			torch.nn.init.xavier_uniform_(param.data)
+			# 		elif 'weight_hh' in name:
+			# 			torch.nn.init.orthogonal_(param.data)
+			# 		elif 'bias' in name:
+						# param.data.fill_(0)
 
 	def forward(self, im):
 		batch_size = im.size(0)
@@ -112,13 +109,14 @@ class AttentionLocalizationModel(nn.Module):
 		for next_im in cropped_images:
 			# next_im = next(cropped_images)
 			feature_i = self.features(next_im).view(batch_size, -1)
+			feature_i = self.drop_out(feature_i)
 			# hx = self.rnn(feature_i, hx)
 			features.append(feature_i)
 			counter += 1
 
 		features = torch.stack(features).permute(1,0,2)
-		attention_score = torch.matmul(F.relu(torch.matmul(features, self.attention_1)), self.attention_2).squeeze()
-		# attention_score = torch.matmul(features, self.attention_1).squeeze()
+		# attention_score = torch.matmul(F.relu(torch.matmul(features, self.attention_1)), self.attention_2).squeeze()
+		attention_score = torch.matmul(features, self.attention_1).squeeze()
 		attention_score = F.softmax(attention_score, dim=1).view(batch_size, counter, 1)
 		scored_features = features * attention_score
 		condensed_feature = torch.sum(scored_features, dim=1)
