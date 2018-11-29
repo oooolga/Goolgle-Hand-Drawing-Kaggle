@@ -14,6 +14,9 @@ from util.load_data import load_quickdraw_data, get_unique_labels, load_quickdra
 from util.save_prediction import get_prediction_dataframe
 from util.model_util import save_checkpoint, load_checkpoint
 from models.vgg_model import VGGModel
+from models.ResNet import resnet
+from models.basic_model import BasicModel
+from models.attention_localization import AttentionLocalizationModel
 
 result_path = 'results/'
 
@@ -42,12 +45,11 @@ def predict(model, data_loader):
 	return pred_matrix
 
 
-
 if __name__ == '__main__':
 	# get arguments
 	args = parse()
 
-	model = VGGModel(vgg_name='VGG13')
+	model = AttentionLocalizationModel(nlabels=31)
 	if use_cuda:
 		model.cuda()
 
@@ -55,9 +57,9 @@ if __name__ == '__main__':
 	params = sum([np.prod(p.size()) for p in model_parameters])
 	print('Total number of parameters: {}\n'.format(params))
 
-	optimizer = optim.Adam(params=model.parameters(), lr=0, weight_decay=0)
+	#optimizer = optim.Adam(params=model.parameters(), lr=0, weight_decay=0)
 
-	model, _, _, _, unique_labels = load_checkpoint(args.load_model, model, optimizer)
+	model, _, _, _, unique_labels = load_checkpoint(args.load_model, model, None)
 
 	test_loader = load_quickdraw_test_data(50)
 

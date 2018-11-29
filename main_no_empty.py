@@ -83,7 +83,7 @@ def parse():
 						help='Total number of epochs.')
 	parser.add_argument('--seed', default=123, type=int,
 						help='Random number seed.')
-	parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay')
+	parser.add_argument('--weight_decay', default=5e-4, type=float, help='Weight decay')
 	parser.add_argument('--model_name', required=True, type=str, help='Model name')
 	parser.add_argument('--load_model', default=None, type=str, help='Load model path')
 	parser.add_argument('--optimizer', default='Adam', type=str, help='Optimizer type')
@@ -118,7 +118,7 @@ if __name__ == '__main__':
 		optimizer = optim.SGD(model.parameters(), lr = args.learning_rate, momentum=0.9,
 							  weight_decay=args.weight_decay)
 
-	scheduler = StepLR(optimizer, step_size=2, gamma=0.8)
+	scheduler = StepLR(optimizer, step_size=10, gamma=0.8)
 
 	if args.load_model is None:
 		epoch_start = 0

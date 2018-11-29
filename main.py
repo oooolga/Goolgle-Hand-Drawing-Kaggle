@@ -11,7 +11,7 @@ import numpy as np
 import argparse, os
 
 from util.model_util import save_checkpoint, load_checkpoint
-from util.load_data import load_quickdraw_data, get_unique_labels
+from util.load_data import load_quickdraw_data, get_unique_labels, load_quickdraw_data_all
 from models.vgg_model import VGGModel
 from models.ResNet import resnet
 from models.basic_model import BasicModel
@@ -86,6 +86,7 @@ def parse():
 	parser.add_argument('--model_name', required=True, type=str, help='Model name')
 	parser.add_argument('--load_model', default=None, type=str, help='Load model path')
 	parser.add_argument('--optimizer', default='Adam', type=str, help='Optimizer type')
+	parser.add_argument('--load_all_train', action='store_true', help='Load all data as train flag')
 
 	args = parser.parse_args()
 	return args
@@ -118,7 +119,7 @@ if __name__ == '__main__':
 		optimizer = optim.SGD(model.parameters(), lr = args.learning_rate, momentum=0.9,
 							  weight_decay=args.weight_decay)
 
-	scheduler = StepLR(optimizer, step_size=2, gamma=0.7)
+	scheduler = StepLR(optimizer, step_size=10, gamma=0.8)
 
 	if args.load_model is None:
 		epoch_start = 0
@@ -128,10 +129,14 @@ if __name__ == '__main__':
 		model, optimizer, epoch_start, best_valid_acc, unique_labels = \
 								load_checkpoint(args.load_model, model, optimizer)
 
-	train_loader, valid_loader = load_quickdraw_data(
-													batch_size=args.batch_size,
-													test_batch_size=args.test_batch_size,
-													unique_labels=unique_labels)
+	if args.load_all_train:
+		train_loader = load_quickdraw_data_all(batch_size=args.batch_size,
+											   unique_labels=unique_labels)
+	else:
+		train_loader, valid_loader = load_quickdraw_data(
+														batch_size=args.batch_size,
+														test_batch_size=args.test_batch_size,
+														unique_labels=unique_labels)
 
 
 	for epoch_i in range(epoch_start, args.epochs+1):
@@ -141,14 +146,19 @@ if __name__ == '__main__':
 		if epoch_i != 0:
 			train(model, optimizer, train_loader)
 
-		test(model, valid_loader)
+		if not args.load_all_train:
+			test(model, valid_loader)
 		test(model, train_loader, mode='train')
 
 		print('|\t\t[Train]:\taccuracy={:.3f}\tloss={:.3f}'.format(state['train_acc'],
 																   state['train_loss']))
 
-		print('|\t\t[Valid]:\taccuracy={:.3f}\tloss={:.3f}'.format(state['valid_acc'],
-																   state['valid_loss']))
+		if not args.load_all_train:
+			print('|\t\t[Valid]:\taccuracy={:.3f}\tloss={:.3f}'.format(state['valid_acc'],
+																	   state['valid_loss']))
+		else:
+			state['valid_acc'] = state['train_acc']
+
 
 
 		if state['valid_acc'] > best_valid_acc:

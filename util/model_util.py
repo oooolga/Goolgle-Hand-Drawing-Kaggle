@@ -7,11 +7,12 @@ def save_checkpoint(state, save_path):
 	print('Finished saving model: {}'.format(save_path))
 
 
-def load_checkpoint(model_path, model, optimizer):
+def load_checkpoint(model_path, model, optimizer=None):
 	if model_path and os.path.isfile(model_path):
 		checkpoint = torch.load(model_path)
 		model.load_state_dict(checkpoint['state_dict'])
-		optimizer.load_state_dict(checkpoint['optimizer'])
+		if optimizer is not None:
+			optimizer.load_state_dict(checkpoint['optimizer'])
 		epoch_i = checkpoint['epoch_i']
 		best_valid_acc = checkpoint['best_acc']
 		unique_labels = checkpoint['unique_labels']

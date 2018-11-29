@@ -7,7 +7,7 @@ use_cuda = torch.cuda.is_available()
 
 import pdb
 
-def crop_images(im, kernel_size=30, stride=10, im_size=(100,100)):
+def crop_images(im, kernel_size=30, stride=7, im_size=(100,100)):
 	batch_size = im.size(0)
 	cropped_im = []
 
@@ -35,16 +35,27 @@ class AttentionLocalizationModel(nn.Module):
 		self.c_in = c_in
 		# self.layers = 2
 		self.features = nn.Sequential(
-			nn.Conv2d(c_in, 16, kernel_size=3),
-			nn.BatchNorm2d(16),
+			nn.Conv2d(c_in, 32, kernel_size=3),
+			nn.BatchNorm2d(32),
+			nn.ReLU(),
+			nn.Conv2d(32, 50, kernel_size=1),
+			nn.BatchNorm2d(50),
 			nn.ReLU(),
 			#nn.MaxPool2d(kernel_size=2, stride=2),
-			nn.Conv2d(16, 32, kernel_size=5, stride=2),
-			nn.BatchNorm2d(32),
+			nn.Conv2d(50, 50, kernel_size=5, stride=2),
+			nn.BatchNorm2d(50),
 			nn.ReLU(),
-			nn.MaxPool2d(kernel_size=2, stride=2),
-			nn.Conv2d(32, 32, kernel_size=5),
-			nn.BatchNorm2d(32),
+			nn.Conv2d(50, 50, kernel_size=5),
+			nn.BatchNorm2d(50),
+			nn.ReLU(),
+			nn.Conv2d(50, 50, kernel_size=5),
+			nn.BatchNorm2d(50),
+			nn.ReLU(),
+			nn.Conv2d(50, 100, kernel_size=1),
+			nn.BatchNorm2d(100),
+			nn.ReLU(),
+			nn.Conv2d(100, 100, kernel_size=3),
+			nn.BatchNorm2d(100),
 			nn.ReLU())
 		# self.features = nn.Sequential(
 		# 	nn.Conv2d(c_in, 64, kernel_size=3),
@@ -71,13 +82,13 @@ class AttentionLocalizationModel(nn.Module):
 		# 	self.h0 = self.h0.cuda()
 
 		self.drop_out = nn.Dropout()
-		self.attention_1 = new_parameter(128, 1)
-		#self.attention_2 = new_parameter(32, 1)
+		self.attention_1 = new_parameter(400, 100)
+		self.attention_2 = new_parameter(100, 1)
 
 		self.classifier = nn.Sequential(
-			nn.Linear(128, 50),
+			nn.Linear(400, 200),
 			nn.ReLU(),
-			nn.Linear(50, self.nlabels)
+			nn.Linear(200, self.nlabels)
 			)
 
 		for m in self.modules():
@@ -115,8 +126,8 @@ class AttentionLocalizationModel(nn.Module):
 			counter += 1
 
 		features = torch.stack(features).permute(1,0,2)
-		# attention_score = torch.matmul(F.relu(torch.matmul(features, self.attention_1)), self.attention_2).squeeze()
-		attention_score = torch.matmul(features, self.attention_1).squeeze()
+		attention_score = torch.matmul(F.relu(torch.matmul(features, self.attention_1)), self.attention_2).squeeze()
+		# attention_score = torch.matmul(features, self.attention_1).squeeze()
 		attention_score = F.softmax(attention_score, dim=1).view(batch_size, counter, 1)
 		scored_features = features * attention_score
 		condensed_feature = torch.sum(scored_features, dim=1)
