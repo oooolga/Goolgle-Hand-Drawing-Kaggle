@@ -5,6 +5,10 @@ from torch.optim.lr_scheduler import StepLR
 
 use_cuda = torch.cuda.is_available()
 
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+
 import pdb
 from tqdm import tqdm
 import numpy as np
@@ -17,9 +21,15 @@ from models.ResNet import resnet
 from models.basic_model import BasicModel
 from models.attention_localization import AttentionLocalizationModel
 
-state = {'train_loss': None,
-		 'valid_loss': None,
-		 'valid_accuracy': None}
+state = {'train_loss': [],
+		 'train_acc': [],
+		 'valid_loss': [],
+		 'valid_acc': []}
+plot_state = {'train_loss': [],
+			  'train_acc': [],
+			  'valid_loss': [],
+			  'valid_acc': [],
+			  'epochs': []}
 
 model_path = 'saved_models/'
 
@@ -65,8 +75,8 @@ def test(model, data_loader, mode='valid'):
 
 			del output, data, target
 
-	state['{}_loss'.format(mode)] = loss_avg / len(data_loader)
-	state['{}_acc'.format(mode)] = correct / len(data_loader.dataset)
+	state['{}_loss'.format(mode)].append(loss_avg / len(data_loader))
+	state['{}_acc'.format(mode)].append(correct / len(data_loader.dataset))
 
 
 
@@ -82,11 +92,12 @@ def parse():
 						help='Total number of epochs.')
 	parser.add_argument('--seed', default=123, type=int,
 						help='Random number seed.')
-	parser.add_argument('--weight_decay', default=5e-4, type=float, help='Weight decay')
-	parser.add_argument('--model_name', required=True, type=str, help='Model name')
-	parser.add_argument('--load_model', default=None, type=str, help='Load model path')
-	parser.add_argument('--optimizer', default='Adam', type=str, help='Optimizer type')
-	parser.add_argument('--load_all_train', action='store_true', help='Load all data as train flag')
+	parser.add_argument('--weight_decay', default=5e-4, type=float, help='Weight decay.')
+	parser.add_argument('--model_name', required=True, type=str, help='Model name.')
+	parser.add_argument('--load_model', default=None, type=str, help='Load model path.')
+	parser.add_argument('--optimizer', default='Adam', type=str, help='Optimizer type.')
+	parser.add_argument('--load_all_train', action='store_true', help='Load all data as train flag.')
+	parser.add_argument('--plot_path', default='results', type=str, help='Path for plots.')
 
 	args = parser.parse_args()
 	return args
@@ -100,9 +111,9 @@ if __name__ == '__main__':
 	if use_cuda:
 		torch.cuda.manual_seed_all(args.seed)
 
-	# model = VGGModel(vgg_name='VGG8')
+	model = VGGModel(vgg_name='VGG13')
 	# model = resnet(model_name='resnet18', pretrained=False, num_classes=31)
-	model = AttentionLocalizationModel(nlabels=31)
+	# model = AttentionLocalizationModel(nlabels=31)
 	#model = BasicModel()
 	if use_cuda:
 		model.cuda()
@@ -138,6 +149,7 @@ if __name__ == '__main__':
 														test_batch_size=args.test_batch_size,
 														unique_labels=unique_labels)
 
+	plot_freq = 5
 
 	for epoch_i in range(epoch_start, args.epochs+1):
 		print('|\tEpoch {}/{}:'.format(epoch_i, args.epochs))
@@ -150,19 +162,22 @@ if __name__ == '__main__':
 			test(model, valid_loader)
 		test(model, train_loader, mode='train')
 
-		print('|\t\t[Train]:\taccuracy={:.3f}\tloss={:.3f}'.format(state['train_acc'],
-																   state['train_loss']))
+		print('|\t\t[Train]:\taccuracy={:.3f}\tloss={:.3f}'.format(state['train_acc'][-1],
+																   state['train_loss'][-1]))
 
 		if not args.load_all_train:
-			print('|\t\t[Valid]:\taccuracy={:.3f}\tloss={:.3f}'.format(state['valid_acc'],
-																	   state['valid_loss']))
+			print('|\t\t[Valid]:\taccuracy={:.3f}\tloss={:.3f}'.format(state['valid_acc'][-1],
+																	   state['valid_loss'][-1]))
 		else:
-			state['valid_acc'] = state['train_acc']
+			state['valid_acc'].append(state['train_acc'][-1])
 
+		if epoch_i%plot_freq == 0:
+			for k in state:
+				plot_state[k].append(state[k][-1])
+			plot_state['epochs'].append(epoch_i)
 
-
-		if state['valid_acc'] > best_valid_acc:
-			best_valid_acc = state['valid_acc']
+		if state['valid_acc'][-1] > best_valid_acc:
+			best_valid_acc = state['valid_acc'][-1]
 			save_checkpoint({
 				'epoch_i': epoch_i,
 				'state_dict': model.state_dict(),
@@ -170,3 +185,31 @@ if __name__ == '__main__':
 				'best_acc': best_valid_acc,
 				'unique_labels': unique_labels
 				}, os.path.join(model_path, args.model_name+'.pt'))
+
+	plt.close('all')
+	fig, ax1 = plt.subplots()
+	line_ta = ax1.plot(plot_state['epochs'], plot_state['train_acc'], color="#7aa0c4", label='train acc')
+	line_va = ax1.plot(plot_state['epochs'], plot_state['valid_acc'], color="#ca82e1", label='valid acc')
+	ax1.set_xlabel('epoch')
+	ax1.set_ylabel('accuracy')
+
+	ax2 = ax1.twinx()
+	line_tl = ax2.plot(plot_state['epochs'], plot_state['train_loss'], color="#8bcd50", label='train loss')
+	line_vl = ax2.plot(plot_state['epochs'], plot_state['valid_loss'], color="#e18882", label='valid loss')
+	ax2.set_ylabel('loss')
+
+	lines = line_ta + line_va + line_tl + line_vl
+	labs = [l.get_label() for l in lines]
+
+	#fig.subplots_adjust(right=0.75) 
+	box = ax1.get_position()
+	ax1.set_position([box.x0, box.y0 + box.height * 0.1,
+					box.width, box.height * 0.9])
+	ax1.legend(lines, labs, loc='upper center', bbox_to_anchor=(0.5, -0.05),
+     				 fancybox=True, shadow=True, ncol=5)
+	fig.tight_layout()
+	plt.title('Training curves')
+	plt.savefig(os.path.join(args.plot_path, args.model_name+'_training_curve.png'),
+				bbox_inches='tight')
+	plt.clf()
+	plt.close('all')
